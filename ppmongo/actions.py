@@ -11,9 +11,11 @@ def pprint(cursor, args):
 def analyze(cursor, args):
     analyzing.analyze(list(cursor))
 
+
 def flat(cursor, args):
     if not args.fields:
-        raise Exception('Flat list requires a  field list')
+        raise Exception('Flat list requires a field list')
+
     paths = [key.split('.') for key in args.fields]
     for document in cursor:
         vals = []
@@ -25,6 +27,7 @@ def flat(cursor, args):
                     break
             vals.append(unicode(d))
         print (u'\t'.join(vals)).encode('utf-8')
+
 
 def count(cursor, args):
     print cursor.count()

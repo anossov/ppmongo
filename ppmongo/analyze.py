@@ -1,10 +1,6 @@
+# -*- coding: utf-8 -*-
 """
-Post analyzer.
-USAGE:
-
-$ python analyze_posts.py '{"provider": "twitter"}'   # mongo JSON query
-
-Total posts: 8658
+Document analyzer.
 
 Keys:
      (all)   -> truncated          # all posts have a 'truncated' key
@@ -21,27 +17,37 @@ Keys:
         ...         #  ETC
 
 """
-import sys
-import json
+
 from collections import defaultdict, Hashable
 
+INDENT = 9
+VALUE_INDENT = 7
 
-from pymongo import Connection
+MAX_DISTINCT = 20
+MIN_PERCENTAGE = 5.0
+
+NODE_STATS_COLOR = 36  # cyan
+LEAF_STATS_COLOR = 30  # gray
 
 
-MISC = "\033[1;36m(misc)\033[00m"
-NO_KEYS = "\033[1;36m(empty object)\033[00m"
+MISC       = u"\033[1;36m(misc)\033[00m"
+NO_KEYS    = u"\033[1;36m(empty object)\033[00m"
+ALWAYS     = u'\033[1;36m →  always → \033[00m'
+ALL        = u"\033[1;{}m     (all)    → \033[00m {}"
+PERCENTAGE = u"\033[1;{}m{:6d}  {:3.0f}%  → \033[00m {}"
 
-def stat_str(count, total, value, color=36):
+
+def stat_str(count, total, value, color=LEAF_STATS_COLOR):
     if count == total:
-        return "\033[1;%sm     (all)   ->\033[00m %s" % (color, value)
+        return ALL.format(color, value)
     else:
-        return "\033[1;%sm%6d  %3.0f%% ->\033[00m %s" % (color, count, count*100.0/total, value)
+        return PERCENTAGE.format(color, count, count * 100.0 / total, value)
+
 
 def analyze(objects, i=0):
     keys = defaultdict(list)
 
-    indent = '         '*i
+    indent = ' ' * INDENT * i
 
     print indent + 'Keys:'
 
@@ -54,7 +60,7 @@ def analyze(objects, i=0):
 
     for k, v in sorted(keys.items(), key=lambda p: len(p[1]), reverse=True):
         l = len(v)
-        print indent + stat_str(l, len(objects), k),
+        print indent + stat_str(l, len(objects), k, NODE_STATS_COLOR),
         if k == NO_KEYS:
             print
             continue
@@ -74,42 +80,26 @@ def analyze(objects, i=0):
                 sorted_values = sorted(values.items(), key=lambda p: p[1], reverse=True)
 
                 if len(sorted_values) == 1:
-                    print '\033[1;36m-> always ->\033[00m', sorted_values[0][0]
+                    print ALWAYS, sorted_values[0][0]
                     continue
                 else:
                     print
 
-                v_indent = indent + '       '
+                v_indent = indent + ' ' * VALUE_INDENT
 
                 for k, count in sorted_values:
-                    percentage = count*100.0/l
+                    percentage = count * 100.0 / l
 
-                    if percentage < 5.0 and not isinstance(k, type):
-                        if len(sorted_values) > 30:
+                    if percentage < MIN_PERCENTAGE and not isinstance(k, type):
+                        if len(sorted_values) > MAX_DISTINCT:
                             other += count
                             continue
-                    print v_indent + stat_str(count, l, k, 30)
+                    print v_indent + stat_str(count, l, k).encode('utf-8')
                     if k == dict:
                         print
                         analyze([p for p in v if isinstance(p, dict)], i + 1)
 
                 if other:
-                    print v_indent + stat_str(other, l, MISC, 30)
+                    print v_indent + stat_str(other, l, MISC).encode('utf-8')
 
     print
-
-if __name__ == '__main__':
-    query = {}
-    if len(sys.argv) > 1:
-        query = json.loads(sys.argv[1])
-
-    collection = Connection()['rtb']['smaato_bid_requests']
-
-    total = collection.find(query, {'_id': 0}).count()
-
-    print 'Total posts: %d' % total
-
-    if total == 0:
-        sys.exit()
-    print
-    analyze(list(collection.find(query, {'_id': 0})))

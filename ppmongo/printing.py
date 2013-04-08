@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 "Colourful pretty-printing"
 
+
 def pval(val, i=1):
     "Format a value, indent level 'i'"
 
@@ -49,9 +50,10 @@ def pdict(dct, i=1):
 
     return res
 
+
 def pformat(value):
     return "".join(pval(value))
 
+
 def pprint(value):
     print pformat(value).encode("utf-8")
-
