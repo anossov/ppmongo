@@ -1,85 +1,32 @@
+ppmongo
+-------
+
 Pretty-prints data from mongo
 
-Usage:
-
-  ppmongo COLLECTION [JSON_QUERY|(OPTION|ACTION|KEY=VALUE)*]
-
-Options: occur before key-value pair
-    re: value is treated like a regexp
-    int: value is treated like a number
-    fields: affects all following key-value pairs: field=1 means include field,
-            field=0 means exclude field, like in mongo
-
-Actions:
-
-    count: can occur anywhere - print number of objects instead of objects
-    analyze: analyze objects, count keys and values
-    flat: flat list without pretty-printing. Works only with 'fields'
-
-Examples:
-
-    $ ppmongo posts count
-    82804
-
-    $ ppmongo posts count provider=twitter
-    10115
-
-    $ ppmongo raw re task_key=vkontakte
-
-    --------------------------------------------------------------------------------
-     {
-       task_key -> vkontakte:18976004:comments:1031021_2977
-       response ->  [ (5)
-           4
-            {
-               date -> 1312477098
-               text -> таки как давно ви в мтс работаете?
-               uid -> 12630040
-
-      ...
 
 
-    $ ppmongo posts count provider=twitter author.id=113162301
-    12
+usage: ppmongo [-h] [-H HOST] [-P PORT] [-D DB] [-C COLLECTION]
+               [-f FIELDNAME [FIELDNAME ...]] [-j JSON] [--count] [--analyze]
+               [--flat]
+               [FIELD=VALUE [FIELD=VALUE ...]]
 
-    $ ppmongo posts count provider=twitter re author.id=^1131
-    12
+Retrieve and pretty-print data from mongodb
 
+positional arguments:
+  FIELD=VALUE           A quick way to search by specific fields
 
-    $ ppmongo posts id=91180877924679680 fields content=1
-
-    --------------------------------------------------------------------------------
-     {
-       content ->  [ (2)
-           ef856bac6ffd207a285c465ab47d22e7
-           dbf0dd7f941d9c5152b691552a0e0a00
-         ]
-       _id -> 4e26fbd9472af974eac9112b
-     }
-
-
-    $ ppmongo posts id=91180877924679680 fields raw=0
-
-    --------------------------------------------------------------------------------
-     {
-       is_comment -> False
-       likes_size -> 0
-       comments_size -> 0
-       author ->  {
-           id -> 19418770
-           name -> kukushechkin
-         }
-       comments -> [ ]
-       content ->  [ (2)
-           ef856bac6ffd207a285c465ab47d22e7
-           dbf0dd7f941d9c5152b691552a0e0a00
-         ]
-       likes -> [ ]
-       provider -> twitter
-       created_time -> 2011-07-13 16:23:10
-       viewable_by ->  [ (1)
-           18976004
-         ]
-       _id -> 4e26fbd9472af974eac9112b
-       id -> 91180877924679680
-     }
+optional arguments:
+  -h, --help            show this help message and exit
+  -H HOST, --host HOST  MongoDB host name
+  -P PORT, --port PORT  MongoDB port
+  -D DB, --database DB  database name
+  -C COLLECTION, --collection COLLECTION
+                        MongoDB collection name
+  -f FIELDNAME [FIELDNAME ...], --field FIELDNAME [FIELDNAME ...]
+                        A list of fields that should be returned.
+  -j JSON, --json JSON  A SON object that results must match
+  --count               Count objects instead of displaying
+  --analyze             Analyze documents structure
+  --flat                Output flat tab-separated of field values instead of
+                        pretty-printing objects. Requires a list of fields set
+                        with -f options.
