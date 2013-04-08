@@ -18,8 +18,13 @@ setup(name='ppmongo',
     author_email='anossov@gmail.com',
 
     classifiers=[
-            'Development Status :: 3 - Alpha',
+            'Development Status :: 2 - Pre-Alpha',
             'Programming Language :: Python :: 2.7',
+            'Environment :: Console',
+            'Intended Audience :: Developers',
+            'License :: OSI Approved :: BSD License',
+            'Topic :: Utilities',
+            'Topic :: Database'
         ],
 
     url='https://github.com/anossov/ppmongo',
