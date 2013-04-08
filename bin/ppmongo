@@ -1,176 +1,103 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""
-Pretty-prints data from mongo
-Usage:
-  barnget COLLECTION [JSON_QUERY|(OPTION|ACTION|KEY=VALUE)*]
-
-Options: occur before key-value pair
-    re: value is treated like a regexp
-    int: value is treated like a number
-    fields: affects all following key-value pairs: field=1 means include field,
-            field=0 means exclude field, like in mongo
-Actions:
-    count: can occur anywhere - print number of objects instead of objects
-    analyze: analyze objects, count keys and values
-    flat: flat list without pretty-printing. Works only with 'fields'
-
-Examples:
-    $ ./barnget posts count
-    82804
-
-    $ ./barnget posts count provider=twitter
-    10115
-
-    $ ./barnget raw re task_key=vkontakte
-
-    --------------------------------------------------------------------------------
-     {
-       task_key -> vkontakte:18976004:comments:1031021_2977
-       response ->  [ (5)
-           4
-            {
-               date -> 1312477098
-               text -> таки как давно ви в мтс работаете?
-               uid -> 12630040
-
-      ...
-
-
-    $ ./barnget posts count provider=twitter author.id=113162301
-    12
-
-    $ ./barnget posts count provider=twitter re author.id=^1131
-    12
-
-
-    $ ./barnget posts id=91180877924679680 fields content=1
-
-    --------------------------------------------------------------------------------
-     {
-       content ->  [ (2)
-           ef856bac6ffd207a285c465ab47d22e7
-           dbf0dd7f941d9c5152b691552a0e0a00
-         ]
-       _id -> 4e26fbd9472af974eac9112b
-     }
-
-
-    $ ./barnget posts id=91180877924679680 fields raw=0
-
-    --------------------------------------------------------------------------------
-     {
-       is_comment -> False
-       likes_size -> 0
-       comments_size -> 0
-       author ->  {
-           id -> 19418770
-           name -> kukushechkin
-         }
-       comments -> [ ]
-       content ->  [ (2)
-           ef856bac6ffd207a285c465ab47d22e7
-           dbf0dd7f941d9c5152b691552a0e0a00
-         ]
-       likes -> [ ]
-       provider -> twitter
-       created_time -> 2011-07-13 16:23:10
-       viewable_by ->  [ (1)
-           18976004
-         ]
-       _id -> 4e26fbd9472af974eac9112b
-       id -> 91180877924679680
-     }
-"""
-
-import sys
 import json
 import pymongo
+import argparse
 
-from ppmongo.analyze import analyze
-from ppmongo import printing as pprint
+from ppmongo import actions
 
 if __name__ == '__main__':
-    db = pymongo.Connection()['rtb']
+    parser = argparse.ArgumentParser(description='Retrieve and pretty-print data from mongodb')
 
-    collection = db[sys.argv[1]]
+    parser.add_argument('-H', '--host', dest='host', default=None,
+                help='MongoDB host name')
+    parser.add_argument('-P', '--port', dest='port', default=None,
+                help='MongoDB port')
+    parser.add_argument('-D', '--database', dest='db', default=None,
+                help='database name')
+    parser.add_argument('-C', '--collection', dest='collection', default=None,
+                help='MongoDB collection name')
+
+    parser.add_argument('-f', '--field', dest='fields', action='store',
+                        metavar='FIELDNAME', nargs='+', default=[],
+                        help='A list of fields that should be returned. ')
+
+    parser.add_argument('-j', '--json', dest='json',
+                        help='A SON object that results must match')
+
+    parser.add_argument('queries', nargs='*',
+                        metavar='FIELD=VALUE',
+                        help='A quick way to search by specific fields')
+
+    parser.add_argument('--count', dest='action',
+                        action='store_const', const=actions.count,
+                        default=actions.pprint,
+                        help='Count objects instead of displaying')
+
+    parser.add_argument('--analyze', dest='action',
+                        action='store_const', const=actions.analyze,
+                        default=actions.pprint,
+                        help='Analyze documents structure')
+
+    parser.add_argument('--flat', dest='action',
+                        action='store_const', const=actions.flat,
+                        default=actions.pprint,
+                        help='Output flat tab-separated of field values '
+                             'instead of pretty-printing objects. '
+                             'Requires a list of fields set with -f options.')
+
+    args = parser.parse_args()
+
+    connection = pymongo.Connection(host=args.host, port=args.port)
+    dbname = args.db
+    if dbname is None:
+        dbnames = connection.database_names()
+        if len(dbnames) == 0:
+            parser.exit(1, 'MongoDB instance at {0.host}:{0.port}'
+                           ' has no databases.\n'.format(connection))
+        elif len(dbnames) == 1:
+            dbname = dbnames[0]
+        else:
+            parser.exit(1, 'Please supply a database name'
+                           ' (ppmongo -D DBNAME). '
+                           'Available databases: {}.\n'.format(', '.join(dbnames)))
+
+    db = connection[dbname]
+
+    cname = args.collection
+    if cname is None:
+        cnames = [c for c in db.collection_names() if not c.startswith('system.')]
+        if len(cnames) == 0:
+            parser.exit(1, 'Database {} has no collections.\n'.format(dbname))
+        elif len(cnames) == 1:
+            cname = cnames[0]
+        elif len(cnames) < 100:
+            parser.exit(1, 'Please supply a collection name'
+                           ' (ppmongo -C COLLECTION). '
+                           'Available collections: {}.\n'.format(', '.join(db.collection_names())))
+        else:
+            parser.exit(1, 'Please supply a collection name'
+                           ' (ppmongo -C COLLECTION).\n')
+
+    collection = connection[dbname][cname]
 
     Q = {}
-    re = False
-    i = False
-    fields = False
-    js = False
-    action = None
-    F = None
 
-    if len(sys.argv) > 2:
-        Q = {}
-        for p in sys.argv[2:]:
+    if args.fields:
+        F = {k: 1 for k in args.fields}
+        F['_id'] = 0
+    else:
+        F = None
 
-            if js:
-                js = False
-                try:
-                    Q.update(json.loads(p))
-                except ValueError, e:
-                    print e
-                    Q = None
+    if args.json:
+        Q.update(json.loads(args.json))
 
-                continue
-
-            if '=' in p:
-                k, v = p.split('=')
-
-                if re:
-                    v = {'$regex': v}
-                    re = False
-                elif i:
-                    v = int(v)
-                    i = False
-                elif v == 'None':
-                    v = None
-
-                if fields:
-                    F[k] = int(v)
-                else:
-                    Q[k] = v
-            else:
-                if p == 're':
-                    re = True
-                elif p == 'int':
-                    i = True
-                elif p in ('count', 'analyze', 'flat'):
-                    action = p
-                elif p == 'fields':
-                    fields = True
-                    F = {}
-                elif p == 'json':
-                    js = True
+    for q in args.queries:
+        k, v = q.split('=')
+        if v == 'None':
+            v = None
+        Q[k] = v
 
     cur = collection.find(Q, F)
-    if action == 'count':
-        print cur.count()
-    elif action == 'analyze':
-        analyze(list(cur))
-    elif action == 'flat':
-        if F is None:
-            raise Exception('Flat list requires field list')
-        key = F.keys()[0].split('.')
-        paths = [key.split('.') for key in F.keys()]
-        for document in cur:
-            vals = []
-            for key in paths:
-                d = document
-                for k in key:
-                    d = d.get(k, '')
-                    if d == '':
-                        break
-                vals.append(unicode(d))
-            print (u'\t'.join(vals)).encode('utf-8')
-    else:
-        i = 1
-        for document in cur:
-            print u'-' * 80, i
-
-            pprint.pprint(document)
-            i += 1
+    args.action(cur, args)
