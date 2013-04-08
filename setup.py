@@ -28,7 +28,7 @@ setup(name='ppmongo',
         ],
 
     url='https://github.com/anossov/ppmongo',
-    license='LICENSE.txt',
+    license='BSD',
     description='Retrieve and pretty-print data from mongo',
     long_description=readme('README.txt'),
     install_requires=[
