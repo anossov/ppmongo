@@ -10,7 +10,8 @@ Keys:
         ...
 
      (all)   -> user        # all posts have a 'user' key..
-         Keys:              # with objects as value, and those objects having the following keys:
+         Keys:              # with objects as value,
+                            # and those objects having the following keys:
            (all)   -> id             # all post.user have an 'id' key
                 (all)   -> (misc)    # most values of post.user.id are different
 
@@ -20,7 +21,7 @@ Keys:
 
 from __future__ import unicode_literals, print_function
 
-from collections import defaultdict, Hashable
+from collections import defaultdict, Hashable, Counter
 
 INDENT = 9
 VALUE_INDENT = 7
@@ -40,6 +41,8 @@ PERCENTAGE = "\033[1;{}m{:6d}  {:3.0f}%  → \033[00m {}"
 
 
 def stat_str(count, total, value, color=LEAF_STATS_COLOR):
+    "Format a colored stats string for a value"
+
     if count == total:
         return ALL.format(color, value)
     else:
@@ -47,61 +50,65 @@ def stat_str(count, total, value, color=LEAF_STATS_COLOR):
 
 
 def analyze(objects, i=0):
+    "Analyze the documents and print the results"
+
     keys = defaultdict(list)
 
     indent = ' ' * INDENT * i
 
     print(indent + 'Keys:')
 
-    for p in objects:
-        if len(p.keys()) == 0:
+    for doc in objects:
+        if len(doc.keys()) == 0:
             keys[NO_KEYS].append(None)
         else:
-            for k in p.keys():
-                keys[k].append(p[k])
+            for key, value in doc.items():
+                keys[key].append(value)
 
-    for k, v in sorted(keys.items(), key=lambda p: len(p[1]), reverse=True):
-        l = len(v)
-        print(indent + stat_str(l, len(objects), k, NODE_STATS_COLOR), end='')
-        if k == NO_KEYS:
+    sndlen = lambda p: len(p[1])
+
+    for key, subdocs in sorted(keys.items(), key=sndlen, reverse=True):
+        nvals = len(subdocs)
+        stats = stat_str(nvals, len(objects), key, NODE_STATS_COLOR)
+        print(indent + stats, end='')
+        if key == NO_KEYS:
             print()
             continue
-        if l != 0:
-            if all(isinstance(item, dict) for item in v):
-                print()
-                analyze(v, i + 1)
-            else:
-                values = defaultdict(int)
-                for value in v:
-                    if isinstance(value, Hashable):
-                        values[value] += 1
-                    else:
-                        values[type(value)] += 1
+        if not nvals:
+            continue
 
-                other = 0
-                sorted_values = sorted(values.items(), key=lambda p: p[1], reverse=True)
+        if all(isinstance(item, dict) for item in subdocs):
+            print()
+            analyze(subdocs, i + 1)
+            continue
 
-                if len(sorted_values) == 1:
-                    print(ALWAYS, sorted_values[0][0])
+        values = Counter(value
+                         if isinstance(value, Hashable)
+                         else type(value)
+                         for value in subdocs)
+
+        if len(values) == 1:
+            print(ALWAYS, values.keys()[0])
+            continue
+
+        print()
+
+        v_indent = indent + ' ' * VALUE_INDENT
+
+        other = 0
+        for k, count in values.most_common():
+            percentage = count * 100.0 / nvals
+
+            if percentage < MIN_PERCENTAGE and not isinstance(k, type):
+                if len(values) > MAX_DISTINCT:
+                    other += count
                     continue
-                else:
-                    print()
+            print(v_indent + stat_str(count, nvals, k))
+            if k == dict:
+                print()
+                analyze([p for p in subdocs if isinstance(p, dict)], i + 1)
 
-                v_indent = indent + ' ' * VALUE_INDENT
-
-                for k, count in sorted_values:
-                    percentage = count * 100.0 / l
-
-                    if percentage < MIN_PERCENTAGE and not isinstance(k, type):
-                        if len(sorted_values) > MAX_DISTINCT:
-                            other += count
-                            continue
-                    print(v_indent + stat_str(count, l, k))
-                    if k == dict:
-                        print()
-                        analyze([p for p in v if isinstance(p, dict)], i + 1)
-
-                if other:
-                    print(v_indent + stat_str(other, l, MISC))
+        if other:
+            print(v_indent + stat_str(other, nvals, MISC))
 
     print()

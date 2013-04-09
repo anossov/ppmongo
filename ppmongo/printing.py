@@ -54,8 +54,12 @@ def pdict(dct, i=1):
 
 
 def pformat(value):
+    "Return a formatted string for printing"
+
     return "".join(pval(value))
 
 
 def pprint(value):
+    "Pretty-print a value"
+
     print(pformat(value).encode("utf-8"))

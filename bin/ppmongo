@@ -1,23 +1,75 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+'Retrieve and pretty-print data from mongodb'
 
 import json
 import pymongo
 import argparse
 
-from ppmongo import actions
+from ppmongo import actions, PPMongoError
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Retrieve and pretty-print data from mongodb')
+
+def get_db(connection, args):
+    """Return a database specified by args.db.
+    If no db is specified and there is only a single one, return that.
+    """
+
+    dbname = args.db
+    if dbname is None:
+        dbnames = connection.database_names()
+        if len(dbnames) == 0:
+            raise PPMongoError('MongoDB instance at {0.host}:{0.port}'
+                              ' has no databases.\n'.format(connection))
+        elif len(dbnames) == 1:
+            dbname = dbnames[0]
+        else:
+            raise PPMongoError('Please supply a database name'
+                               ' (ppmongo -D DBNAME). '
+                               'Available databases: {}.\n'
+                               .format(', '.join(dbnames)))
+
+    return connection[dbname]
+
+
+def get_collection(database, args):
+    """Return a collection from the database specified by args.collection.
+    If no collection is specified and there is a single one, return that.
+    """
+
+    cname = args.collection
+    if cname is None:
+        collections = database.collection_names()
+        cnames = [c for c in collections if not c.startswith('system.')]
+        if len(cnames) == 0:
+            raise PPMongoError('Database {} has no collections.\n'
+                               .format(database.name))
+        elif len(cnames) == 1:
+            cname = cnames[0]
+        elif len(cnames) < 100:
+            raise PPMongoError('Please supply a collection name'
+                               ' (ppmongo -C COLLECTION). '
+                               'Available collections: {}.\n'
+                               .format(', '.join(collections)))
+        else:
+            raise PPMongoError('Please supply a collection name'
+                               ' (ppmongo -C COLLECTION).\n')
+
+    return database[cname]
+
+
+def main():
+    "ppmongo main entry point"
+
+    parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument('-H', '--host', dest='host', default=None,
-                help='MongoDB host name')
+                        help='MongoDB host name')
     parser.add_argument('-P', '--port', dest='port', default=None,
-                help='MongoDB port')
+                        help='MongoDB port')
     parser.add_argument('-D', '--database', dest='db', default=None,
-                help='database name')
+                        help='database name')
     parser.add_argument('-C', '--collection', dest='collection', default=None,
-                help='MongoDB collection name')
+                        help='MongoDB collection name')
 
     parser.add_argument('-f', '--field', dest='fields', action='store',
                         metavar='FIELDNAME', nargs='+', default=[],
@@ -50,54 +102,32 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     connection = pymongo.Connection(host=args.host, port=args.port)
-    dbname = args.db
-    if dbname is None:
-        dbnames = connection.database_names()
-        if len(dbnames) == 0:
-            parser.exit(1, 'MongoDB instance at {0.host}:{0.port}'
-                           ' has no databases.\n'.format(connection))
-        elif len(dbnames) == 1:
-            dbname = dbnames[0]
+    try:
+        database = get_db(connection, args)
+        collection = get_collection(database, args)
+
+        queryspec = {}
+
+        if args.fields:
+            fields = {k: 1 for k in args.fields}
+            fields['_id'] = 0
         else:
-            parser.exit(1, 'Please supply a database name'
-                           ' (ppmongo -D DBNAME). '
-                           'Available databases: {}.\n'.format(', '.join(dbnames)))
+            fields = None
 
-    db = connection[dbname]
+        if args.json:
+            queryspec.update(json.loads(args.json))
 
-    cname = args.collection
-    if cname is None:
-        cnames = [c for c in db.collection_names() if not c.startswith('system.')]
-        if len(cnames) == 0:
-            parser.exit(1, 'Database {} has no collections.\n'.format(dbname))
-        elif len(cnames) == 1:
-            cname = cnames[0]
-        elif len(cnames) < 100:
-            parser.exit(1, 'Please supply a collection name'
-                           ' (ppmongo -C COLLECTION). '
-                           'Available collections: {}.\n'.format(', '.join(db.collection_names())))
-        else:
-            parser.exit(1, 'Please supply a collection name'
-                           ' (ppmongo -C COLLECTION).\n')
+        for query in args.queries:
+            field, value = query.split('=')
+            if value == 'None':
+                value = None
+            queryspec[field] = value
 
-    collection = connection[dbname][cname]
+        cur = collection.find(queryspec, fields)
+        args.action(cur, args)
 
-    Q = {}
+    except PPMongoError as error:
+        parser.exit(1, str(error))
 
-    if args.fields:
-        F = {k: 1 for k in args.fields}
-        F['_id'] = 0
-    else:
-        F = None
-
-    if args.json:
-        Q.update(json.loads(args.json))
-
-    for q in args.queries:
-        k, v = q.split('=')
-        if v == 'None':
-            v = None
-        Q[k] = v
-
-    cur = collection.find(Q, F)
-    args.action(cur, args)
+if __name__ == '__main__':
+    main()
