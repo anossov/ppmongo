@@ -6,7 +6,7 @@ def readme(fn):
         return f.read()
 
 setup(name='ppmongo',
-    version='0.1.1',
+    version='0.1.2',
     packages=[
             'ppmongo',
         ],
@@ -18,7 +18,7 @@ setup(name='ppmongo',
     author_email='anossov@gmail.com',
 
     classifiers=[
-            'Development Status :: 2 - Pre-Alpha',
+            'Development Status :: 4 - Beta',
             'Programming Language :: Python :: 2.7',
             'Programming Language :: Python :: 3',
             'Environment :: Console',

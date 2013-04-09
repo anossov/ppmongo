@@ -21,6 +21,7 @@ Keys:
 
 from __future__ import unicode_literals, print_function
 
+from itertools import chain
 from collections import defaultdict, Hashable, Counter
 
 INDENT = 9
@@ -35,6 +36,8 @@ LEAF_STATS_COLOR = 30  # gray
 
 MISC       = "\033[1;36m(misc)\033[00m"
 NO_KEYS    = "\033[1;36m(empty object)\033[00m"
+VALUES     = "\033[1;36m(items)\033[00m"
+LIST       = "\033[1;36m (list)\033[00m"
 ALWAYS     = '\033[1;36m →  always → \033[00m'
 ALL        = "\033[1;{}m     (all)    → \033[00m {}"
 PERCENTAGE = "\033[1;{}m{:6d}  {:3.0f}%  → \033[00m {}"
@@ -49,6 +52,12 @@ def stat_str(count, total, value, color=LEAF_STATS_COLOR):
         return PERCENTAGE.format(color, count, count * 100.0 / total, value)
 
 
+def alldicts(objects):
+    "Return True if all objects are dicts"
+
+    return all(isinstance(item, dict) for item in objects)
+
+
 def analyze(objects, i=0):
     "Analyze the documents and print the results"
 
@@ -58,18 +67,23 @@ def analyze(objects, i=0):
 
     print(indent + 'Keys:')
 
+    ndocs = 0
     for doc in objects:
-        if len(doc.keys()) == 0:
-            keys[NO_KEYS].append(None)
+        ndocs += 1
+        if isinstance(doc, dict):
+            if len(doc.keys()) == 0:
+                keys[NO_KEYS].append(None)
+            else:
+                for key, value in doc.items():
+                    keys[key].append(value)
         else:
-            for key, value in doc.items():
-                keys[key].append(value)
+            keys[VALUES].append(doc)
 
     sndlen = lambda p: len(p[1])
 
     for key, subdocs in sorted(keys.items(), key=sndlen, reverse=True):
         nvals = len(subdocs)
-        stats = stat_str(nvals, len(objects), key, NODE_STATS_COLOR)
+        stats = stat_str(nvals, ndocs, key, NODE_STATS_COLOR)
         print(indent + stats, end='')
         if key == NO_KEYS:
             print()
@@ -77,7 +91,7 @@ def analyze(objects, i=0):
         if not nvals:
             continue
 
-        if all(isinstance(item, dict) for item in subdocs):
+        if alldicts(subdocs):
             print()
             analyze(subdocs, i + 1)
             continue
@@ -88,7 +102,12 @@ def analyze(objects, i=0):
                          for value in subdocs)
 
         if len(values) == 1:
-            print(ALWAYS, values.keys()[0])
+            only = values.keys()[0]
+            if only == list:
+                print(LIST)
+                analyze(chain.from_iterable(subdocs), i + 1)
+            else:
+                print(ALWAYS, values.keys()[0])
             continue
 
         print()
