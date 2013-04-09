@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 "Colourful pretty-printing"
 
+from __future__ import unicode_literals, print_function
+
 
 def pval(val, i=1):
     "Format a value, indent level 'i'"
@@ -18,7 +20,7 @@ def pval(val, i=1):
         else:
             res.append(' [ ]\n')
     else:
-        res.append((u' %s' % val).replace(u'\n', u' '))
+        res.append((' %s' % val).replace(u'\n', u' '))
         res.append('\n')
 
     return res
@@ -43,7 +45,7 @@ def pdict(dct, i=1):
     res = [' {\n']
     for key, val in dct.items():
         res.append('  ' * i)
-        res.append(u' \033[1;36m%s →\033[00m' % key)
+        res.append(' \033[1;36m%s →\033[00m' % key)
         res.extend(pval(val, i + 1))
     res.append('  ' * (i - 1))
     res.append(' }\n')
@@ -56,4 +58,4 @@ def pformat(value):
 
 
 def pprint(value):
-    print pformat(value).encode("utf-8")
+    print(pformat(value).encode("utf-8"))

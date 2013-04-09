@@ -1,10 +1,12 @@
+from __future__ import unicode_literals, print_function
+
 from . import analyze as analyzing
 from . import printing
 
 
 def pprint(cursor, args):
     for i, document in enumerate(cursor):
-        print u'-' * 80, i
+        print('-' * 80, i)
         printing.pprint(document)
 
 
@@ -26,8 +28,8 @@ def flat(cursor, args):
                 if d == '':
                     break
             vals.append(unicode(d))
-        print (u'\t'.join(vals)).encode('utf-8')
+        print((u'\t'.join(vals)).encode('utf-8'))
 
 
 def count(cursor, args):
-    print cursor.count()
+    print(cursor.count())

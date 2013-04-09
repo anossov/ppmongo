@@ -3,10 +3,10 @@ import codecs
 
 def readme(fn):
     with codecs.open(fn, encoding='utf-8') as f:
-        return unicode(f.read())
+        return f.read()
 
 setup(name='ppmongo',
-    version='0.1.0',
+    version='0.1.1',
     packages=[
             'ppmongo',
         ],
@@ -20,6 +20,7 @@ setup(name='ppmongo',
     classifiers=[
             'Development Status :: 2 - Pre-Alpha',
             'Programming Language :: Python :: 2.7',
+            'Programming Language :: Python :: 3',
             'Environment :: Console',
             'Intended Audience :: Developers',
             'License :: OSI Approved :: BSD License',
