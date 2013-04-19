@@ -6,7 +6,7 @@ def readme(fn):
         return f.read()
 
 setup(name='ppmongo',
-    version='0.1.2',
+    version='0.1.3',
     packages=[
             'ppmongo',
         ],
